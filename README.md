@@ -88,11 +88,11 @@ first. Pitches are the sounding pitches; the tab staff works out the frets.
 | Vibrato, wide vibrato | A wavy line |
 | Trills | Trill sign with the fret to trill to |
 | Natural harmonics | Diamond notes; sounding pitch in the notation when a chord is all harmonics at one fret |
-| Tapped and artificial harmonics | "T.H. 17", "A.H. (C 8va)" labels |
+| Tapped and artificial harmonics | Diamond notes; the tab shows the fret held and the fret touched or tapped, e.g. `7(19)`; one "A.H. 8va" / "T.H." label per run |
 | Palm muting, let ring | Dashed "P.M." line, "let ring" label |
 | Dead notes, ghost notes | `\deadNote`, parentheses |
 | Accents, staccato, fermata, pick strokes, arpeggios, tremolo picking, tapping | Native articulations |
-| Tremolo bar | "w/bar dip ½" style labels |
+| Tremolo bar (whammy) | A small graph of the pitch (dip, dive, return, …) with the amount in steps, e.g. "w/bar −½" |
 | Volume swells | Crescendo/decrescendo hairpins |
 | 8va, 15ma, 8vb, 15mb | Octave lines |
 | Guitar In | Tuning changes and boxed "Gtr. N" labels where a guitar takes over a staff |

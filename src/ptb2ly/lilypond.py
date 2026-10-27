@@ -84,8 +84,16 @@ BAR_GLYPHS = {
     P.Barline.FINE: "|.",
 }
 
-TREMOLO_BAR_TEXT = ["dip", "dive & release", "dive & hold", "release",
-                    "return & release", "return & hold", "inverted dip"]
+# Whammy bar types, in Power Tab's order: the shorthand that draws each one,
+# and the sign written before the amount.
+WHAMMY = [("wDip", "−"), ("wDive", "−"), ("wDiveHold", "−"), ("wRelease", ""),
+          ("wReturn", ""), ("wReturnHold", ""), ("wInvDip", "+")]
+
+# Where an artificial harmonic is touched, in frets above the fretted note,
+# by how far above it sounds: an octave at 12 frets, octave + fifth at 7, ...
+HARMONIC_TOUCH = {12: 12, 19: 7, 24: 5, 28: 4}
+
+OCTAVE_TEXT = {12: " 8va", 24: " 15ma"}
 
 AUDIO_RELEASE = ["single", "EP", "album", "double album", "triple album", "box set"]
 
@@ -163,6 +171,28 @@ slideIn = #(define-music-function (from) (ly:music?)
   #{ \grace { \hideNotes #from \unHideNotes } #})
 % Chord name above the music, e.g. \chord "Em7".
 chord = #(define-event-function (text) (markup?) #{ ^\markup \upright \bold #text #})
+% Artificial or tapped harmonic: a diamond note head, and in the tab the fret
+% held with the fret touched or tapped in brackets, e.g. \harm "7(19)" b\3.
+harm = #(define-music-function (tab note) (markup? ly:music?)
+  #{ \tweak NoteHead.style #'harmonic
+     \tweak TabNoteHead.stencil #(lambda (grob) (grob-interpret-markup grob tab))
+     #note #})
+% Whammy bar: a small graph of the pitch with the amount above it, in steps,
+% e.g. \wDip "−½" (a quick dip of a half step and back). The graph takes up
+% room, so the notes spread out instead of the graphs piling up.
+#(define (whammy graph)
+   (define-event-function (amount) (markup?)
+     #{ -\tweak extra-spacing-width #'(-0.3 . 0.3)
+        -\tweak extra-spacing-height #'(-inf.0 . +inf.0)
+        ^\markup \small \center-column { #amount \path #0.15 #graph } #}))
+wDip = #(whammy '((moveto 0 1) (lineto 1.2 0) (lineto 2.4 1)))
+wInvDip = #(whammy '((moveto 0 0) (lineto 1.2 1) (lineto 2.4 0)))
+wDive = #(whammy '((moveto 0 1) (lineto 2.4 0)))
+wDiveHold = #(whammy '((moveto 0 1) (lineto 1.6 0) (lineto 2.4 0)))
+wReturn = #(whammy '((moveto 0 0) (lineto 2.4 1)))
+wReturnHold = #(whammy '((moveto 0 0) (lineto 1.6 1) (lineto 2.4 1)))
+wRelease = #(whammy '((moveto 0 0) (lineto 0.6 0) (moveto 0.9 0) (lineto 1.5 0)
+                       (moveto 1.8 0) (lineto 2.4 0)))
 """
 
 # From the LilyPond documentation ("Transposing pitches with minimum
@@ -334,6 +364,7 @@ class NoteOut:
     dead: bool = False
     ghost: bool = False
     harmonic: bool = False
+    tab_text: Optional[str] = None  # artificial/tapped harmonic, e.g. "7(19)"
 
 
 Source = Union[P.Position, P.RhythmSlash, None]
@@ -363,6 +394,8 @@ class Event:
     vibrato: int = 0               # 0 none, 1 normal, 2 wide
     ottava: int = 0
     swell: int = 0                 # +1 crescendo, -1 decrescendo
+    harmonic_label: Optional[str] = None   # "A.H. 8va", "T.H.", ...
+    whammy: Optional[Tuple[str, str]] = None   # (shorthand, amount)
     tremolo: bool = False
     beam_start: bool = False
     beam_end: bool = False
@@ -667,6 +700,7 @@ class ScoreConverter:
             out.harmonic = n.has(P.NATURAL_HARMONIC)
             if out.harmonic:
                 harmonic_frets.add(n.fret)
+            self.note_harmonic(ev, n, out)
             if n.has(P.TIED) and not ev.grace:
                 match = None
                 # \harmonicByFret chords sound at another pitch: no tie out of them.
@@ -687,13 +721,6 @@ class ScoreConverter:
                 labels.append(bend_markup(n.bend))
             if n.trill is not None:
                 labels.append(f'\\trillTo "{n.trill}"')
-            if n.tapped_harmonic is not None:
-                labels.append(f'\\fx "T.H. {n.tapped_harmonic}"')
-            if n.artificial_harmonic is not None:
-                key, variation, octave = n.artificial_harmonic
-                text = P.ChordName._key_text(key, variation)
-                text += {1: " 8va", 2: " 15ma"}.get(octave, "")
-                labels.append(f'\\fx "A.H. ({text})"')
             for flag, level in ((P.OCTAVE_8VA, 1), (P.OCTAVE_15MA, 2),
                                 (P.OCTAVE_8VB, -1), (P.OCTAVE_15MB, -2)):
                 if n.has(flag):
@@ -727,12 +754,37 @@ class ScoreConverter:
             ev.post.append('\\fx "T"')
         if p.tremolo_bar:
             ttype, _, pitch = p.tremolo_bar
-            text = TREMOLO_BAR_TEXT[ttype] if ttype < len(TREMOLO_BAR_TEXT) else "bar"
-            amount = quarter_steps(pitch) if pitch else ""
-            ev.post.append(f'\\fx {ly_string(("w/bar " + text + " " + amount).strip())}')
+            if ttype < len(WHAMMY):
+                shorthand, sign = WHAMMY[ttype]
+                # Amounts are in quarter steps: 4 is one whole step.
+                amount = sign + ("1" if pitch == 4 else quarter_steps(pitch)) if pitch else ""
+                ev.whammy = (shorthand, amount)
+            else:
+                ev.post.append('\\fx "w/bar"')
         if p.volume_swell:
             start, end, _ = p.volume_swell
             ev.swell = 1 if end >= start else -1
+
+    @staticmethod
+    def note_harmonic(ev: Event, n: P.Note, out: NoteOut) -> None:
+        """Artificial and tapped harmonics: diamond heads, "7(19)" in the tab.
+
+        The label ("A.H. 8va") says how far above the written note the
+        harmonic sounds; it is printed once for a run of such notes.
+        """
+        if n.tapped_harmonic is not None:
+            tapped = n.tapped_harmonic
+            out.tab_text = f"{n.fret}({tapped})"
+            ev.harmonic_label = "T.H." + OCTAVE_TEXT.get(tapped - n.fret, "")
+        if n.artificial_harmonic is not None:
+            key, _, octave = n.artificial_harmonic
+            # Written as the harmonic's note at or above the fretted note,
+            # sounding 0, 1 or 2 octaves higher.
+            up = (key - out.pitch) % 12
+            out.pitch += up
+            touch = HARMONIC_TOUCH.get(up + 12 * octave)
+            out.tab_text = f"{n.fret}({n.fret + touch})" if touch else str(n.fret)
+            ev.harmonic_label = "A.H." + OCTAVE_TEXT.get(12 * octave, "")
 
     @staticmethod
     def note_slide(ev: Event, n: P.Note, out: NoteOut, tuning: List[int], capo: int) -> None:
@@ -821,6 +873,8 @@ class ScoreConverter:
             self.apply_let_ring(main)
             self.apply_vibrato(main)
             self.apply_swells(main)
+            self.apply_harmonic_labels(main)
+            self.apply_whammy(main)
             self.apply_ottava([e for e in stream if not e.grace])
         for bar in self.bars:
             for vb in [vb for staff in bar.voices for vb in staff] + [bar.slashes]:
@@ -876,6 +930,25 @@ class ScoreConverter:
                 events[j].post.append("\\pmOff")
             else:
                 events[i].post.append("\\pm")
+
+    def apply_harmonic_labels(self, events: List[Event]) -> None:
+        """One "A.H. 8va" label at the start of each run of such notes."""
+        for i, _ in self.runs(events, lambda e: e.harmonic_label):
+            events[i].post.append(f"\\fx {ly_string(events[i].harmonic_label)}")
+
+    def apply_whammy(self, events: List[Event]) -> None:
+        """A graph for each whammy bar event, with "w/bar" on the first of a run.
+
+        Within a run, an amount is only written when it changes.
+        """
+        for i, j in self.runs(events, lambda e: e.whammy is not None):
+            for k in range(i, j + 1):
+                shorthand, amount = events[k].whammy
+                if k == i:
+                    amount = ("w/bar " + amount).strip()
+                elif events[k - 1].whammy == events[k].whammy:
+                    amount = ""
+                events[k].post.append(f"\\{shorthand} {ly_string(amount)}")
 
     def apply_let_ring(self, events: List[Event]) -> None:
         for i, _ in self.runs(events, lambda e: e.let_ring):
@@ -988,7 +1061,7 @@ class ScoreConverter:
     # -- rendering: notes ---------------------------------------------------
 
     def render_note(self, n: NoteOut) -> str:
-        s = ""
+        s = f"\\harm {ly_string(n.tab_text)} " if n.tab_text else ""
         if n.dead:
             s += "\\deadNote "
         if n.ghost:

@@ -462,15 +462,32 @@ def test_note_labels():
     body = staff1(one_bar(pos(0, 2, notes=[note(2, 5, complex=complexes)]),
                           pos(1, 2, notes=[note(2, 5, complex=[(ord("h") << 24) | (1 << 16) | (1 << 8) | 0])]),
                           ))
-    assert '\\bendUp "full"' in body and '\\trillTo "7"' in body and '\\fx "T.H. 17"' in body
-    assert '\\fx "A.H. (C 8va)"' in body
+    assert '\\bendUp "full"' in body and '\\trillTo "7"' in body
+    # Fret 5 on the G string (c'), tapped 12 frets up / an octave harmonic of C.
+    assert body.count('<\\harm "5(17)" c\'\\3>2') == 2
+    assert '\\fx "T.H. 8va"' in body and '\\fx "A.H. 8va"' in body
 
 
-def test_artificial_harmonic_plain_octave():
-    body = staff1(one_bar(pos(0, 1, notes=[note(2, 5, complex=[(ord("h") << 24) | (2 << 16) | (1 << 8) | 9])])))
-    assert '\\fx "A.H. (A 15ma)"' in body
-    body = staff1(one_bar(pos(0, 1, notes=[note(2, 5, complex=[(ord("h") << 24) | (1 << 8) | 9])])))
-    assert '\\fx "A.H. (A)"' in body
+def artificial(key: int, octave: int) -> int:
+    return (ord("h") << 24) | (octave << 16) | (1 << 8) | key
+
+
+def test_artificial_harmonics():
+    # Written as the harmonic's note at or above the fretted c'; the tab shows
+    # where it is touched when that is a usual harmonic.
+    body = staff1(one_bar(pos(0, 4, notes=[note(2, 5, complex=[artificial(7, 1)])]),    # G 8va
+                          pos(1, 4, notes=[note(2, 5, complex=[artificial(9, 2)])]),    # A 15ma
+                          pos(2, 4, notes=[note(2, 5, complex=[artificial(9, 0)])]),    # A loco
+                          pos(3, 4, notes=[note(2, 5, complex=[artificial(9, 0)])])))
+    assert '<\\harm "5(12)" g\'\\3>4 \\fx "A.H. 8va"' in body
+    assert '<\\harm "5" a\'\\3>4 \\fx "A.H. 15ma"' in body
+    # One label for a run of notes with the same label.
+    assert body.count('\\fx "A.H."') == 1
+
+
+def test_tapped_harmonic_off_the_octave():
+    body = staff1(one_bar(pos(0, 1, notes=[note(2, 5, complex=[(ord("f") << 24) | 12])])))
+    assert '<\\harm "5(12)" c\'\\3>1 \\fx "T.H."' in body
 
 
 @pytest.mark.parametrize("flag, expected", [
@@ -495,10 +512,20 @@ def test_tremolo_picking():
 
 
 def test_tremolo_bar():
-    body = staff1(one_bar(pos(0, 2, notes=[E6], complex=[(ord("c") << 24) | (1 << 16) | 8]),
-                          pos(1, 2, notes=[E6], complex=[(ord("c") << 24) | (9 << 16)])))
-    assert '\\fx "w/bar dive & release 2"' in body
-    assert '\\fx "w/bar bar"' in body
+    def whammy(ttype: int, pitch: int) -> int:
+        return (ord("c") << 24) | (ttype << 16) | pitch
+
+    # Every type in a row (a run), a rest, then one more and an unknown type.
+    # The repeated dip at the end of the run doesn't repeat its amount.
+    run = [(0, 2), (1, 4), (2, 6), (3, 0), (4, 0), (5, 1), (6, 2), (6, 2)]
+    positions = [pos(i, 16, notes=[E6], complex=[whammy(t, q)]) for i, (t, q) in enumerate(run)]
+    positions += [pos(8, 16, P.REST), pos(9, 16, notes=[E6], complex=[whammy(0, 8)]),
+                  pos(10, 16, notes=[E6], complex=[whammy(9, 0)])]
+    body = staff1(one_bar(*positions))
+    for expected in ['\\wDip "w/bar −½"', '\\wDive "−1"', '\\wDiveHold "−1½"', '\\wRelease ""',
+                     '\\wReturn ""', '\\wReturnHold "¼"', '\\wInvDip "+½" <e,\\6>16 \\wInvDip ""',
+                     '\\wDip "w/bar −2"', '\\fx "w/bar"']:
+        assert expected in body
 
 
 def test_volume_swells():

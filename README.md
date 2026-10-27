@@ -132,6 +132,43 @@ All 2,964 files in `instant-song-library/` convert.
   bytes lost inside text (lyrics, notes) aren't noticed until well past the
   text, so the right places to re-insert them can't be found reliably.
 
+### Open issues
+
+`scripts/check-library.sh` converts and typesets the whole library and
+collects LilyPond's warnings. The last complete run (before the fixes below)
+had no conversion errors and no LilyPond failures, only layout warnings.
+
+Fixed since that run; a fresh run will confirm the library-wide numbers:
+
+- Long lyrics and notes ran off the bottom of the page (171 songs). They
+  now continue onto the next page.
+- Over-full pages (~700 songs, mostly mild). Page breaking now plans for
+  extra room between lines of music, and labels above notes take up room on
+  the line instead of piling up; on samples, few crowded pages remain.
+- Two tempo marks at the same moment (3 songs) and hairpins too short to
+  draw (7 songs).
+- Harmonics and whammy bar were text labels on every note, stacking into
+  tall towers. They are now drawn as in guitar books: diamond notes with
+  `7(19)` in the tab, and small pitch graphs for the whammy bar.
+
+Still open:
+
+- **"No solution found for Bezier intersection"** (17 songs). A LilyPond
+  internal message, probably from an unusual slur, tie or slide curve. The
+  PDF is still written. The construct that triggers it hasn't been found.
+- **Remaining crowded pages.** A few songs with very dense effects may
+  still get an over-full page; to be measured on the next full run.
+- **Artificial harmonics with unusual intervals.** Power Tab stores only the
+  harmonic's note name and octave. It is written at or above the fretted
+  note; when that isn't a real harmonic interval (an octave, octave + fifth,
+  two octaves, ...), the tab shows just the fret held.
+- **Whammy bar length.** Graphs are a fixed size; Power Tab's duration (how
+  many notes the graph spans) is ignored. Every file in the library uses
+  the default, so nothing is lost there.
+- **Check script quirks.** A song whose name ends in "." gets a PDF without
+  the final dot, and an interrupted check can leave `lilypond-tmp-*.pdf`
+  files behind.
+
 ## Code layout
 
 - `src/ptb2ly/ptbparser.py` — reads the binary file into Python objects.

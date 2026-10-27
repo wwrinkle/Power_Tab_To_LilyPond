@@ -146,16 +146,22 @@ STANDARD_TUNINGS = {4: [43, 38, 33, 28], 5: [43, 38, 33, 28, 23],
 
 # Shorthands written at the top of every file, so the music stays readable.
 SHORTHANDS = r"""%% Shorthands for guitar effects used in the music below.
-% A small text label above a note, e.g. \fx "T.H. 17".
-fx = #(define-event-function (text) (markup?) #{ ^\markup \small #text #})
+% A small label above a note. Labels take up room on the line, so the notes
+% spread out instead of the labels piling up, e.g. \noteLabel "full".
+noteLabel = #(define-event-function (text) (markup?)
+  #{ -\tweak extra-spacing-width #'(-0.2 . 0.2)
+     -\tweak extra-spacing-height #'(-inf.0 . +inf.0)
+     ^\markup \small #text #})
+% A text label, e.g. \fx "T.H.".
+fx = #(define-event-function (text) (markup?) #{ \noteLabel #text #})
 % Bends: an arrow and the amount ("full" = a whole step), e.g. \bendUp "full".
 bendUp = #(define-event-function (text) (markup?)
-  #{ ^\markup \small \concat { \fontsize #-5 \arrow-head #Y #UP ##f " " #text } #})
+  #{ \noteLabel \markup \concat { \fontsize #-5 \arrow-head #Y #UP ##f " " #text } #})
 bendDown = #(define-event-function (text) (markup?)
-  #{ ^\markup \small \concat { \fontsize #-5 \arrow-head #Y #DOWN ##f " " #text } #})
+  #{ \noteLabel \markup \concat { \fontsize #-5 \arrow-head #Y #DOWN ##f " " #text } #})
 % Trill with the fret to trill to, e.g. \trillTo "7".
 trillTo = #(define-event-function (fret) (markup?)
-  #{ ^\markup \small \line { \musicglyph "scripts.trill" \concat { "(" #fret ")" } } #})
+  #{ \noteLabel \markup \line { \musicglyph "scripts.trill" \concat { "(" #fret ")" } } #})
 % Palm muting: a dashed "P.M." line from \pmOn to \pmOff (\pm on one note).
 pmOn = -\tweak bound-details.left.text \markup \small \italic "P.M." \startTextSpan
 pmOff = \stopTextSpan
@@ -178,13 +184,10 @@ harm = #(define-music-function (tab note) (markup? ly:music?)
      \tweak TabNoteHead.stencil #(lambda (grob) (grob-interpret-markup grob tab))
      #note #})
 % Whammy bar: a small graph of the pitch with the amount above it, in steps,
-% e.g. \wDip "−½" (a quick dip of a half step and back). The graph takes up
-% room, so the notes spread out instead of the graphs piling up.
+% e.g. \wDip "−½" (a quick dip of a half step and back).
 #(define (whammy graph)
    (define-event-function (amount) (markup?)
-     #{ -\tweak extra-spacing-width #'(-0.3 . 0.3)
-        -\tweak extra-spacing-height #'(-inf.0 . +inf.0)
-        ^\markup \small \center-column { #amount \path #0.15 #graph } #}))
+     #{ \noteLabel \markup \center-column { #amount \path #0.15 #graph } #}))
 wDip = #(whammy '((moveto 0 1) (lineto 1.2 0) (lineto 2.4 1)))
 wInvDip = #(whammy '((moveto 0 0) (lineto 1.2 1) (lineto 2.4 0)))
 wDive = #(whammy '((moveto 0 1) (lineto 2.4 0)))

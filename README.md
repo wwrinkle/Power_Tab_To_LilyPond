@@ -151,8 +151,11 @@ pip install -e ".[test]"
 coverage run -m pytest
 coverage report          # fails below 100%
 ```
-- `reference/powertabeditor/` — Power Tab Editor 2.0 source (GPL), kept for
-  reference only. The parser is a port of
+
+- `reference/powertabeditor/` — a local, untracked clone of the
+  [Power Tab Editor 2.0 source](https://github.com/powertab/powertabeditor)
+  (GPL; checked against commit `8b23e9d`), kept for reference only. Clone it
+  there yourself to follow along. The parser is a port of
   `source/formats/powertab_old/powertabdocument/`, and
   `source/formats/powertab_old/powertaboldimporter.cpp` shows how each field
   is meant to be interpreted.

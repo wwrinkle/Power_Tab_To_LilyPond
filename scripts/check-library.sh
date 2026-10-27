@@ -30,6 +30,8 @@ find "$library" -name '*.ptb' -print0 |
         [ -e "$outdir/ly/$name.ly" ] || printf '%s\0' "$f"
     done |
     xargs -0 -r "$ptb2ly" -o "$outdir/ly" 2> "$outdir/convert-errors.txt"
+# Keep only real errors, not ptb2ly's "converted N of N files" summaries.
+sed -i '/^converted [0-9]* of [0-9]* files$/d' "$outdir/convert-errors.txt"
 echo "converted: $(find "$outdir/ly" -name '*.ly' | wc -l) of $total" | tee "$outdir/progress"
 
 # 2. Compile each .ly that has no finished log. Each log is written to a
@@ -38,13 +40,17 @@ compile_one() {
     ly="$1"; outdir="$2"
     name=$(basename "$ly" .ly)
     log="$outdir/logs/$name.ly.log"
-    lilypond -l WARNING -o "$outdir/pdf/$name" "$ly" > "$log.part" 2>&1
+    # Output to the folder, not a file name: LilyPond would drop a trailing
+    # "." from a name like "T.N.T." as if it began a file extension.
+    lilypond -l WARNING -o "$outdir/pdf/" "$ly" > "$log.part" 2>&1
     echo "exit $?" >> "$log.part"
     mv "$log.part" "$log"
 }
 export -f compile_one
 
-rm -f "$outdir"/logs/*.part
+# Clear what an interrupted run leaves behind: unfinished logs, and the
+# temporary PDFs LilyPond writes before renaming them.
+rm -f "$outdir"/logs/*.part "$outdir"/pdf/lilypond-tmp-*
 find "$outdir/ly" -name '*.ly' -print0 |
     while IFS= read -r -d '' ly; do
         [ -e "$outdir/logs/$(basename "$ly").log" ] || printf '%s\0' "$ly"

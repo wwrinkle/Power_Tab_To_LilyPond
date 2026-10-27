@@ -135,29 +135,37 @@ All 2,964 files in `instant-song-library/` convert.
 ### Open issues
 
 `scripts/check-library.sh` converts and typesets the whole library and
-collects LilyPond's warnings. The last complete run (before the fixes below)
-had no conversion errors and no LilyPond failures, only layout warnings.
+collects LilyPond's warnings. In the latest run every song converts and
+compiles; 52 songs have a warning (down from 878) and 22 a LilyPond
+"programming error" message.
 
-Fixed since that run; a fresh run will confirm the library-wide numbers:
+Fixed since the first full run:
 
 - Long lyrics and notes ran off the bottom of the page (171 songs). They
   now continue onto the next page.
-- Over-full pages (~700 songs, mostly mild). Page breaking now plans for
-  extra room between lines of music, and labels above notes take up room on
-  the line instead of piling up; on samples, few crowded pages remain.
+- Over-full pages (~870 songs, now 52). Page breaking plans for extra room
+  between lines of music, and labels above notes take up room on the line
+  instead of piling up.
 - Two tempo marks at the same moment (3 songs) and hairpins too short to
   draw (7 songs).
 - Harmonics and whammy bar were text labels on every note, stacking into
   tall towers. They are now drawn as in guitar books: diamond notes with
   `7(19)` in the tab, and small pitch graphs for the whammy bar.
+- Check script: PDFs of songs whose name ends in "." lost the final dot,
+  an interrupted check left `lilypond-tmp-*.pdf` files behind, and
+  `ptb2ly`'s "converted N of N files" line was logged as an error.
 
 Still open:
 
-- **"No solution found for Bezier intersection"** (17 songs). A LilyPond
-  internal message, probably from an unusual slur, tie or slide curve. The
-  PDF is still written. The construct that triggers it hasn't been found.
-- **Remaining crowded pages.** A few songs with very dense effects may
-  still get an over-full page; to be measured on the next full run.
+- **"No solution found for Bezier intersection"** (22 songs). A LilyPond
+  internal message from its slur-shaping maths, which fails on some short
+  slurs: slurs next to a triplet number, and the piece of a tab slur that
+  is split by a line break. LilyPond carries on, and every case checked
+  prints correctly. Which songs get it changes with the layout. Placing
+  triplet numbers outside slurs (`TupletNumber.avoid-slur`) removes about
+  half, but the rest have other causes, so it is left as it is.
+- **Crowded pages** (52 songs). Most are mild (49 under 10 staff-spaces,
+  the worst 26); they are songs with very dense notation.
 - **Artificial harmonics with unusual intervals.** Power Tab stores only the
   harmonic's note name and octave. It is written at or above the fretted
   note; when that isn't a real harmonic interval (an octave, octave + fifth,
@@ -165,9 +173,6 @@ Still open:
 - **Whammy bar length.** Graphs are a fixed size; Power Tab's duration (how
   many notes the graph spans) is ignored. Every file in the library uses
   the default, so nothing is lost there.
-- **Check script quirks.** A song whose name ends in "." gets a PDF without
-  the final dot, and an interrupted check can leave `lilypond-tmp-*.pdf`
-  files behind.
 
 ## Code layout
 

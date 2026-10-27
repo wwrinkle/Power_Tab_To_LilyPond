@@ -1329,6 +1329,10 @@ class ScoreConverter:
             nxt = offsets[k + 1] if k + 1 < len(offsets) else bar.length
             here = [(t, a) for oo, t, a in clamp if oo == o or (oo >= bar.length and o == offsets[-1])]
             commands = [t for t, a in here if not a]
+            # LilyPond takes one tempo change per moment and drops the rest
+            # with a warning; keep the first, as it would.
+            first = next((k for k, t in enumerate(commands) if "\\tempo " in t), None)
+            commands = [t for k, t in enumerate(commands) if "\\tempo " not in t or k == first]
             attached = [t for t, a in here if a]
             segments.append(" ".join(commands + ["s" + length_str(nxt - o, bar.beat_value)] + attached))
         return " ".join(segments)
@@ -1428,6 +1432,9 @@ class ScoreConverter:
                  "  \\layout {\n"
                  "    \\context { \\Score \\compressEmptyMeasures" +
                  (" \\autoLineBreaksOff" if self.options.keep_systems else "") + " }\n"
+                 "    % Spread notes so a short hairpin is still visible between\n"
+                 "    % the dynamics at its ends.\n"
+                 "    \\context { \\Score \\override Hairpin.minimum-length = #6 }\n"
                  "    % Hide staves that only have rests on a line of music.\n"
                  "    \\context { \\Staff \\RemoveAllEmptyStaves }\n"
                  "    \\context { \\TabStaff \\RemoveAllEmptyStaves }\n"
@@ -1539,15 +1546,20 @@ def header_block(h: P.Header) -> str:
 
 
 def text_markup(title: str, text: str) -> str:
-    """A titled block of free text, one markup line per source line."""
+    """A titled block of free text, one markup line per source line.
+
+    A markup list rather than a single markup, so LilyPond can carry long
+    text over onto the next page instead of squeezing it onto one.
+    """
     lines = [l.rstrip() for l in text.replace("\r", "").split("\n")]
     while lines and not lines[-1]:
         lines.pop()
     if not lines:
         return ""
-    body = "".join(f"    \\line {{ {ly_string(l) if l.strip() else '\" \"'} }}\n" for l in lines)
-    return (f"\\markup \\column {{\n  \\vspace #1\n  \\bold {ly_string(title)}\n  \\column {{\n"
-            + body + "  }\n}\n")
+    body = "".join(f"  \\line {{ {ly_string(l) if l.strip() else '\" \"'} }}\n" for l in lines)
+    return (f"% {title}: a markup list, so long text continues onto the next page.\n"
+            f"\\markuplist \\column-lines {{\n  \\vspace #1\n  \\bold {ly_string(title)}\n"
+            + body + "}\n")
 
 
 def guitars_markup(score: P.Score) -> str:
@@ -1594,6 +1606,14 @@ def convert_document(doc: P.Document, include_lyrics: bool = True,
     intro.append(SHORTHANDS)
     intro.append("% Slightly smaller staves, so notation and tab fit well on a page.\n"
                  "#(set-global-staff-size 18)\n")
+    intro.append("% When choosing page breaks, plan for extra room between lines of music.\n"
+                 "% LilyPond underestimates tall stacks of marks above the staff, and\n"
+                 "% would otherwise squeeze an over-full page. The printed spacing is\n"
+                 "% unchanged (only padding differs from the defaults).\n"
+                 "\\paper {\n"
+                 "  page-breaking-system-system-spacing =\n"
+                 "    #'((basic-distance . 12) (minimum-distance . 8) (padding . 6) (stretchability . 60))\n"
+                 "}\n")
     intro.append(header_block(h))
 
     scores = [("guitar", doc.guitar_score, h.guitar_transcriber, h.guitar_notes, "Guitar"),

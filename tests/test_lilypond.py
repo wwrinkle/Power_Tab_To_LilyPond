@@ -181,6 +181,8 @@ def test_lyrics_and_options():
     text = ly(doc)
     assert '"Lyrics"' in text and '"Line one"' in text and '"Line two"' in text
     assert '\\line { " " }' in text           # blank line kept
+    # A markup list, so long lyrics can run onto the next page.
+    assert '\\markuplist \\column-lines {\n  \\vspace #1\n  \\bold "Lyrics"\n' in text
     assert '"Lyrics"' not in ly(doc, lyrics=False)
     assert L.text_markup("x", "\n\n") == ""
 
@@ -506,6 +508,10 @@ def test_volume_swells():
     assert "<e,\\6>4 \\< <e,\\6>4 \\! \\> <e,\\6>2 \\!" in body
 
 
+def test_hairpins_have_room():
+    assert "\\override Hairpin.minimum-length = #6" in ly(one_bar(pos(0, 1, notes=[E6])))
+
+
 def test_octave_signs():
     body = staff1(one_bar(pos(0, 4, notes=[note(0, 0, P.OCTAVE_8VA)]),
                           pos(1, 4, notes=[note(0, 0, P.OCTAVE_15MA)]),
@@ -672,6 +678,7 @@ def test_tuning_change_with_clef_change():
     assert "\\removeWithTag #'tab \\guitarStaffI" in text
     assert "\\removeWithTag #'notation \\guitarStaffI" in text
     assert "#(set-global-staff-size 18)" in text
+    assert "page-breaking-system-system-spacing" in text and "(padding . 6)" in text
 
 
 # ---------------------------------------------------------------------------
@@ -780,12 +787,13 @@ def test_rehearsal_signs():
 # ---------------------------------------------------------------------------
 
 def test_tempo_markers():
-    doc = song(score([system([staff([pos(i, 4, notes=[E6]) for i in range(4)])])],
+    # Each marker at its own position: LilyPond takes one tempo per moment.
+    doc = song(score([system([staff([pos(i, 16, notes=[E6]) for i in range(16)])])],
                      tempos=[tempo(0, 0, 120, description="Rock"), tempo(0, 1, 0, type=2, beat=2, listesso=3),
                              tempo(0, 2, 0, type=3, beat=0), tempo(0, 3, 0, type=3, beat=1),
-                             tempo(0, 0, 90, type=0), tempo(0, 0, 0, type=0, description="Freely"),
-                             tempo(0, 0, 100, type=1, beat=12), tempo(0, 0, 80, triplet_feel=1),
-                             tempo(0, 0, 80, triplet_feel=4), tempo(0, 0, 0, type=0)]))
+                             tempo(0, 4, 90, type=0), tempo(0, 5, 0, type=0, description="Freely"),
+                             tempo(0, 6, 100, type=1, beat=12), tempo(0, 7, 80, triplet_feel=1),
+                             tempo(0, 8, 80, triplet_feel=4), tempo(0, 9, 0, type=0)]))
     m = marks(doc)
     assert '\\tempo "Rock" 4 = 120' in m
     assert "\\tempo \\markup { \\rhythm { 4 } = \\rhythm { 4. } }" in m
@@ -795,6 +803,17 @@ def test_tempo_markers():
     assert "\\tempo 4 = 100" in m                   # unknown beat type -> quarter
     assert '"Triplet feel" \\rhythm { 8[ 8] } = \\rhythm { \\tuplet 3/2 { 4 8 } }' in m
     assert '"Triplet feel (off-beat)" \\rhythm { 16[ 16] }' in m
+
+
+def test_one_tempo_per_moment():
+    # Two at the same position, and one past the last note that lands with them.
+    doc = song(score([system([staff([pos(0, 2, notes=[E6]), pos(2, 2, notes=[E6])])])],
+                     tempos=[tempo(0, 2, 50, type=3), tempo(0, 2, 60), tempo(0, 2, 70),
+                             tempo(0, 9, 80)]))
+    m = marks(doc)
+    assert "\\tempo 4 = 60" in m
+    assert "= 70" not in m and "= 80" not in m
+    assert '"rit."' in m                            # other marks stay
 
 
 def test_listesso_with_unknown_beat():

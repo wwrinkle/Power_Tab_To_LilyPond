@@ -30,3 +30,6 @@ out-sample/
 out/
 check-output/
 check-output.log
+
+# Claude Code local settings (and their temporary copies)
+.claude/settings.local.json*

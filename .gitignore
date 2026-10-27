@@ -1,0 +1,32 @@
+# Song library and corrupted files: personal, copyrighted content
+instant-song-library/
+corrupted-ptb/
+*.ptb
+!tests/data/*.ptb
+
+# Power Tab Editor source, kept locally for reference only
+reference/
+
+# Generated output
+*.ly
+*.pdf
+*.png
+*.midi
+!tests/data/*.ly
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+
+# Test coverage data
+.coverage
+.pytest_cache/
+htmlcov/
+out-sample/
+out/
+check-output/
+check-output.log

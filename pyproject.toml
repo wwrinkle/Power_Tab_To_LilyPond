@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ptb2ly"
+version = "0.1.0"
+description = "Convert Power Tab Editor (.ptb) files to LilyPond (.ly)"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "GPL-3.0-or-later" }
+authors = [{ name = "Willie Wrinkle", email = "williewrinkle@gmail.com" }]
+keywords = ["power tab", "lilypond", "guitar", "tablature", "music notation"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Topic :: Multimedia :: Sound/Audio :: Conversion",
+    "Environment :: Console",
+]
+
+[project.scripts]
+ptb2ly = "ptb2ly.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project.optional-dependencies]
+test = ["pytest", "coverage"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["ptb2ly"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 100
